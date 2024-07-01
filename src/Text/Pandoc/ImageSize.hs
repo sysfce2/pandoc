@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {- |
 Module      : Text.Pandoc.ImageSize
-Copyright   : Copyright (C) 2011-2023 John MacFarlane
+Copyright   : Copyright (C) 2011-2024 John MacFarlane
 License     : GNU GPL, version 2 or above
 
 Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -13,6 +13,7 @@ Portability : portable
 Functions for determining the size of a PNG, JPEG, or GIF image.
 -}
 module Text.Pandoc.ImageSize ( ImageType(..)
+                             , ImageSize(..)
                              , imageType
                              , imageSize
                              , sizeInPixels
@@ -51,7 +52,6 @@ import qualified Data.Text.Encoding as TE
 import Control.Applicative
 import qualified Data.Attoparsec.ByteString.Char8 as A
 import qualified Codec.Picture.Metadata as Metadata
-import qualified Codec.Picture.Metadata.Exif as Exif
 import Codec.Picture (decodeImageWithMetadata)
 
 -- quick and dirty functions to get image sizes
@@ -314,17 +314,9 @@ getSize img =
     Left e -> Left (T.pack e)
     Right (_, meta) -> do
       pxx <- maybe (Left "Could not determine width") Right $
-                   -- first look for exif image width, then width
-                   (Metadata.lookup
-                     (Metadata.Exif (Exif.TagUnknown 0xA002)) meta >>=
-                       exifDataToWord) <|>
                    Metadata.lookup Metadata.Width meta
       pxy <- maybe (Left "Could not determine height") Right $
-                  -- first look for exif image height, then height
-                  (Metadata.lookup
-                     (Metadata.Exif (Exif.TagUnknown 0xA003)) meta >>=
-                       exifDataToWord) <|>
-                  Metadata.lookup Metadata.Height meta
+                   Metadata.lookup Metadata.Height meta
       dpix <- maybe (Right 72) Right $ Metadata.lookup Metadata.DpiX meta
       dpiy <- maybe (Right 72) Right $ Metadata.lookup Metadata.DpiY meta
       return $ ImageSize
@@ -332,11 +324,6 @@ getSize img =
                 , pxY = fromIntegral pxy
                 , dpiX = fromIntegral dpix
                 , dpiY = fromIntegral dpiy }
- where
-  exifDataToWord (Exif.ExifLong x) = Just $ fromIntegral x
-  exifDataToWord (Exif.ExifShort x) = Just $ fromIntegral x
-  exifDataToWord _ = Nothing
-
 
 svgSize :: WriterOptions -> ByteString -> Maybe ImageSize
 svgSize opts img = do

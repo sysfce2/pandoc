@@ -6,7 +6,7 @@
 {-# LANGUAGE TupleSections       #-}
 {- |
    Module      : Text.Pandoc.App
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley@edu>
@@ -262,6 +262,7 @@ optToOutputSettings scriptingEngine opts = do
         , writerReferenceDoc     = optReferenceDoc opts
         , writerSyntaxMap        = syntaxMap
         , writerPreferAscii      = optAscii opts
+        , writerLinkImages       = optLinkImages opts
         }
   return $ OutputSettings
     { outputFormat = format

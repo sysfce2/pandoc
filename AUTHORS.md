@@ -65,6 +65,7 @@
 - Cécile Chemin
 - Cédric Couralet
 - Cezary Drożak
+- Chandrahas77
 - Charanjit Singh
 - Charlotte Koch
 - Chris Black
@@ -136,6 +137,7 @@
 - George Stagg
 - Georgi Lyubenov
 - Gokul Rajiv
+- Gordon Woodhull
 - Gottfried Haider
 - Greg Maslov
 - Greg Rundlett
@@ -171,6 +173,7 @@
 - Jake Zimmerman
 - Jakob Voß
 - James Aspnes
+- James P. Ascher
 - James Scott-Brown
 - Jamie F. Olson
 - Jan Larres
@@ -224,6 +227,7 @@
 - Laurent P. René de Cotret
 - Lawrence Chonavel
 - Leif Metcalf
+- Leo Heitmann Ruiz
 - Leonard Rosenthol
 - Lila
 - Link Swanson
@@ -267,6 +271,7 @@
 - Michael Snoyman
 - Michael Stahl
 - Michael Thompson
+- Mickaël Canouil
 - Mike Tzou
 - Mikołaj Machowski
 - Milan Bracke
@@ -360,6 +365,7 @@
 - Terence Eden
 - Thenaesh Elango
 - Thomas Hodgson
+- Thomas Soeiro
 - Thomas Weißschuh
 - Tim Lin
 - Tim Stewart
@@ -418,6 +424,7 @@
 - ebiim
 - ech0
 - favonia
+- guqicun
 - harabat
 - hseg
 - infinity0x
@@ -428,6 +435,7 @@
 - lux-lth
 - luz paz
 - lwolfsonkin
+- mbracke
 - mbrackeantidot
 - mh4ckt3mh4ckt1c4s
 - mjfs

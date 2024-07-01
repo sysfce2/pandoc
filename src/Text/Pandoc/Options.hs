@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {- |
    Module      : Text.Pandoc.Options
-   Copyright   : Copyright (C) 2012-2023 John MacFarlane
+   Copyright   : Copyright (C) 2012-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -325,6 +325,7 @@ data WriterOptions = WriterOptions
   , writerReferenceLocation :: ReferenceLocation    -- ^ Location of footnotes and references for writing markdown
   , writerSyntaxMap         :: SyntaxMap
   , writerPreferAscii       :: Bool           -- ^ Prefer ASCII representations of characters when possible
+  , writerLinkImages        :: Bool           -- ^ Use links rather than embedding ODT images
   } deriving (Show, Data, Typeable, Generic)
 
 instance Default WriterOptions where
@@ -363,6 +364,7 @@ instance Default WriterOptions where
                       , writerReferenceLocation = EndOfDocument
                       , writerSyntaxMap        = defaultSyntaxMap
                       , writerPreferAscii      = False
+                      , writerLinkImages       = False
                       }
 
 instance HasSyntaxExtensions WriterOptions where
@@ -376,7 +378,7 @@ defaultMathJaxURL :: Text
 defaultMathJaxURL = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
 
 defaultKaTeXURL :: Text
-defaultKaTeXURL = "https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/"
+defaultKaTeXURL = "https://cdn.jsdelivr.net/npm/katex@latest/dist/"
 
 -- Update documentation in doc/filters.md if this is changed.
 $(deriveJSON defaultOptions{ fieldLabelModifier =

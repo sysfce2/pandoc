@@ -1,12 +1,11 @@
 {-# LANGUAGE CPP                 #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {- |
    Module      : Text.Pandoc.App.CommandLineOptions
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley@edu>
@@ -199,7 +198,6 @@ handleOptInfo engine info = E.handle (handleError . Left) $ do
       UTF8.hPutStrLn stdout
        $ T.pack
        $ prg ++ " " ++ T.unpack pandocVersionText ++
-         compileInfo ++
          "\nUser data directory: " ++ defaultDatadir ++
          ('\n':copyrightMessage)
     Help -> do
@@ -602,6 +600,14 @@ options =
                         return opt { optEmbedResources =  boolValue })
                   "true|false")
                  "" -- "Make slide shows include all the needed js and css"
+
+    , Option "" ["link-images"] -- maybe True (\argStr -> argStr == "true") arg
+                 (OptArg
+                  (\arg opt -> do
+                        boolValue <- readBoolFromOptArg "--link-images" arg
+                        return opt { optLinkImages =  boolValue })
+                  "true|false")
+                 "" -- "Link images in ODT rather than embedding them"
 
     , Option "" ["request-header"]
                  (ReqArg
@@ -1104,16 +1110,9 @@ usageMessage programName = usageInfo (programName ++ " [OPTIONS] [FILES]")
 
 copyrightMessage :: String
 copyrightMessage = intercalate "\n" [
- "Copyright (C) 2006-2023 John MacFarlane. Web:  https://pandoc.org",
+ "Copyright (C) 2006-2024 John MacFarlane. Web:  https://pandoc.org",
  "This is free software; see the source for copying conditions. There is no",
  "warranty, not even for merchantability or fitness for a particular purpose." ]
-
-compileInfo :: String
-compileInfo =
-  "\nCompiled with pandoc-types " ++ VERSION_pandoc_types ++
-  ", texmath " ++ VERSION_texmath ++ ", skylighting " ++
-  VERSION_skylighting ++ ",\nciteproc " ++ VERSION_citeproc ++
-  ", ipynb " ++ VERSION_ipynb
 
 handleUnrecognizedOption :: String -> [String] -> [String]
 handleUnrecognizedOption "--smart" =

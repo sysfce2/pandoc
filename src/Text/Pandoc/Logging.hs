@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {- |
    Module      : Text.Pandoc.Logging
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -79,6 +79,7 @@ data LogMessage =
   | Fetching Text
   | Extracting Text
   | LoadedResource FilePath FilePath
+  | ScriptingInfo Text (Maybe SourcePos)
   | ScriptingWarning Text (Maybe SourcePos)
   | NoTitleElement Text
   | NoLangSpecified
@@ -101,6 +102,8 @@ data LogMessage =
   | NotUTF8Encoded FilePath
   | MakePDFInfo Text Text
   | MakePDFWarning Text
+  | UnclosedDiv SourcePos SourcePos
+  | UnsupportedCodePage Int
   deriving (Show, Eq, Data, Ord, Typeable, Generic)
 
 instance ToJSON LogMessage where
@@ -203,6 +206,14 @@ instance ToJSON LogMessage where
       LoadedResource orig found ->
            ["for"  .= orig
            ,"from" .= found]
+      ScriptingInfo msg mbpos ->
+           ["message" .= msg] <>
+           case mbpos of
+             Nothing  -> []
+             Just pos -> ["source" .= sourceName pos
+                         ,"line" .= toJSON (sourceLine pos)
+                         ,"column" .= toJSON (sourceColumn pos)
+                         ]
       ScriptingWarning msg mbpos ->
            ["message" .= msg] <>
            case mbpos of
@@ -260,6 +271,18 @@ instance ToJSON LogMessage where
            ,"contents" .= contents]
       MakePDFWarning message ->
            ["message" .= message]
+      UnclosedDiv openpos closepos ->
+           ["openpos" .= object
+             [ "source" .= sourceName openpos,
+               "line" .= toJSON (sourceLine openpos),
+               "column" .= toJSON (sourceColumn openpos)]
+           ,"closepos" .= object
+             [ "source" .= sourceName closepos,
+               "line" .= toJSON (sourceLine closepos),
+               "column" .= toJSON (sourceColumn closepos)]
+           ]
+      UnsupportedCodePage cpg ->
+           ["codepage" .= cpg]
 
 showPos :: SourcePos -> Text
 showPos pos = Text.pack $ sn ++ "line " ++
@@ -338,6 +361,9 @@ showLogMessage msg =
          "Extracting " <> fp <> "..."
        LoadedResource orig found ->
          "Loaded " <> Text.pack orig <> " from " <> Text.pack found
+       ScriptingInfo s mbpos ->
+         "Scripting info" <>
+         maybe "" (\pos -> " at " <> showPos pos) mbpos  <> ": " <> s
        ScriptingWarning s mbpos ->
          "Scripting warning" <>
          maybe "" (\pos -> " at " <> showPos pos) mbpos  <> ": " <> s
@@ -400,6 +426,10 @@ showLogMessage msg =
              then mempty
              else "\n" <> contents
        MakePDFWarning message -> "[makePDF] " <> message
+       UnclosedDiv openpos closepos -> "Div at " <> showPos openpos <>
+          " unclosed at " <> showPos closepos <> ", closing implicitly."
+       UnsupportedCodePage cpg -> "Unsupported code page " <> tshow cpg <>
+          ". Text will likely be garbled."
 
 messageVerbosity :: LogMessage -> Verbosity
 messageVerbosity msg =
@@ -421,7 +451,7 @@ messageVerbosity msg =
        ParsingUnescaped{}            -> INFO
        InlineNotRendered{}           -> INFO
        BlockNotRendered{}            -> INFO
-       DocxParserWarning{}           -> INFO
+       DocxParserWarning{}           -> WARNING
        PowerpointTemplateWarning{}   -> WARNING
        IgnoredIOError{}              -> WARNING
        CouldNotFetchResource{}       -> WARNING
@@ -433,6 +463,7 @@ messageVerbosity msg =
        Fetching{}                    -> INFO
        Extracting{}                  -> INFO
        LoadedResource{}              -> INFO
+       ScriptingInfo{}               -> INFO
        ScriptingWarning{}            -> WARNING
        NoTitleElement{}              -> WARNING
        NoLangSpecified               -> INFO
@@ -455,3 +486,5 @@ messageVerbosity msg =
        NotUTF8Encoded{}              -> WARNING
        MakePDFInfo{}                 -> INFO
        MakePDFWarning{}              -> WARNING
+       UnclosedDiv{}                 -> WARNING
+       UnsupportedCodePage{}         -> WARNING

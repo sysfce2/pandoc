@@ -5,7 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {- |
    Module      : Text.Pandoc.Writers.Shared
-   Copyright   : Copyright (C) 2013-2023 John MacFarlane
+   Copyright   : Copyright (C) 2013-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -45,11 +45,12 @@ module Text.Pandoc.Writers.Shared (
                      , ensureValidXmlIdentifiers
                      , setupTranslations
                      , isOrderedListMarker
+                     , toTaskListItem
                      )
 where
 import Safe (lastMay)
 import qualified Data.ByteString.Lazy as BL
-import Control.Monad (zipWithM)
+import Control.Monad (zipWithM, MonadPlus, mzero)
 import Data.Either (isRight)
 import Data.Aeson (ToJSON (..), encode)
 import Data.Char (chr, ord, isSpace, isLetter, isUpper)
@@ -636,3 +637,10 @@ isOrderedListMarker :: Text -> Bool
 isOrderedListMarker xs = not (T.null xs) && (T.last xs `elem` ['.',')']) &&
               isRight (runParser (anyOrderedListMarker >> eof)
                        defaultParserState "" xs)
+
+toTaskListItem :: MonadPlus m => [Block] -> m (Bool, [Block])
+toTaskListItem (Plain (Str "☐":Space:ils):xs) = pure (False, Plain ils:xs)
+toTaskListItem (Plain (Str "☒":Space:ils):xs) = pure (True, Plain ils:xs)
+toTaskListItem (Para  (Str "☐":Space:ils):xs) = pure (False, Para ils:xs)
+toTaskListItem (Para  (Str "☒":Space:ils):xs) = pure (True, Para ils:xs)
+toTaskListItem _                              = mzero

@@ -8,7 +8,7 @@
 {-# LANGUAGE ViewPatterns        #-}
 {- |
    Module      : Text.Pandoc.Writers.HTML
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -34,7 +34,7 @@ import Control.Monad.State.Strict
     ( StateT, MonadState(get), gets, modify, evalStateT )
 import Control.Monad ( liftM, when, foldM, unless )
 import Control.Monad.Trans ( MonadTrans(lift) )
-import Data.Char (ord)
+import Data.Char (ord, isSpace, isAscii)
 import Data.List (intercalate, intersperse, partition, delete, (\\), foldl')
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Containers.ListUtils (nubOrd)
@@ -43,7 +43,8 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
-import Network.URI (URI (..), parseURIReference)
+import Network.URI (URI (..), parseURIReference, escapeURIString)
+import Text.Pandoc.URI (urlEncode)
 import Numeric (showHex)
 import Text.DocLayout (render, literal, Doc)
 import Text.Blaze.Internal (MarkupM (Empty), customLeaf, customParent)
@@ -61,7 +62,6 @@ import Text.Pandoc.Walk
 import Text.Pandoc.Writers.Math
 import Text.Pandoc.Writers.Shared
 import qualified Text.Pandoc.Writers.AnnotatedTable as Ann
-import Text.Pandoc.URI (urlEncode)
 import Text.Pandoc.XML (escapeStringForXML, fromEntities, toEntities,
                         html5Attributes, html4Attributes, rdfaAttributes)
 import qualified Text.Blaze.XHtml5 as H5
@@ -308,12 +308,13 @@ pandocToHtml opts (Pandoc meta blocks) = do
         modify (\st' -> st'{ stNotes = mempty, stEmittedNotes = stEmittedNotes st' + length (stNotes st') })
         return notes
   st <- get
+  let html5 = stHtml5 st
   let thebody = blocks' >> notes
   let math = layoutMarkup $ case writerHTMLMathMethod opts of
         MathJax url
           | slideVariant /= RevealJsSlides ->
           -- mathjax is handled via a special plugin in revealjs
-            H.script ! A.src (toValue url)
+            H.script ! A.src (toValue $ toURI html5 url)
                     ! A.type_ "text/javascript"
                     $ case slideVariant of
                             SlideousSlides ->
@@ -323,7 +324,7 @@ pandocToHtml opts (Pandoc meta blocks) = do
         KaTeX url -> do
           H.script !
             A.defer mempty !
-            A.src (toValue $ url <> "katex.min.js") $ mempty
+            A.src (toValue $ toURI html5 $ url <> "katex.min.js") $ mempty
           nl
           let katexFlushLeft =
                 case lookupContext "classoption" metadata of
@@ -346,7 +347,7 @@ pandocToHtml opts (Pandoc meta blocks) = do
             ]
           nl
           H.link ! A.rel "stylesheet" !
-            A.href (toValue $ url <> "katex.min.css")
+            A.href (toValue $ toURI html5 url <> "katex.min.css")
 
         _ -> mempty
   let mCss :: Maybe [Text] = lookupContext "css" metadata
@@ -482,21 +483,13 @@ defList :: PandocMonad m
         => WriterOptions -> [Html] -> StateT WriterState m Html
 defList opts items = toList H.dl opts (items ++ [nl])
 
-isTaskListItem :: [Block] -> Bool
-isTaskListItem (Plain (Str "☐":Space:_):_) = True
-isTaskListItem (Plain (Str "☒":Space:_):_) = True
-isTaskListItem (Para  (Str "☐":Space:_):_) = True
-isTaskListItem (Para  (Str "☒":Space:_):_) = True
-isTaskListItem _                           = False
-
 listItemToHtml :: PandocMonad m
                => WriterOptions -> [Block] -> StateT WriterState m Html
-listItemToHtml opts bls
-  | Plain (Str "☐":Space:is) : bs <- bls = taskListItem False id  is bs
-  | Plain (Str "☒":Space:is) : bs <- bls = taskListItem True  id  is bs
-  | Para  (Str "☐":Space:is) : bs <- bls = taskListItem False H.p is bs
-  | Para  (Str "☒":Space:is) : bs <- bls = taskListItem True  H.p is bs
-  | otherwise = blockListToHtml opts bls
+listItemToHtml opts bls =
+  case toTaskListItem bls of
+    Just (checked, (Para is:bs)) -> taskListItem checked H.p is bs
+    Just (checked, (Plain is:bs)) -> taskListItem checked id is bs
+    _ -> blockListToHtml opts bls
   where
     taskListItem checked constr is bs = do
       let checkbox  = if checked
@@ -601,12 +594,14 @@ parseMailto s =
 obfuscateLink :: PandocMonad m
               => WriterOptions -> Attr -> Html -> Text
               -> StateT WriterState m Html
-obfuscateLink opts attr txt s | writerEmailObfuscation opts == NoObfuscation =
-  addAttrs opts attr $ H.a ! A.href (toValue s) $ txt
-obfuscateLink opts attr (TL.toStrict . renderHtml -> txt) s =
+obfuscateLink opts attr txt s | writerEmailObfuscation opts == NoObfuscation = do
+  html5 <- gets stHtml5
+  addAttrs opts attr $ H.a ! A.href (toValue $ toURI html5 s) $ txt
+obfuscateLink opts attr (TL.toStrict . renderHtml -> txt) s = do
+  html5 <- gets stHtml5
   let meth = writerEmailObfuscation opts
-      s' = T.toLower (T.take 7 s) <> T.drop 7 s
-  in  case parseMailto s' of
+  let s' = T.toLower (T.take 7 s) <> T.drop 7 s
+  case parseMailto s' of
         (Just (name', domain)) ->
           let domain'  = T.replace "." " dot " domain
               at'      = obfuscateChar '@'
@@ -634,7 +629,8 @@ obfuscateLink opts attr (TL.toStrict . renderHtml -> txt) s =
                      linkText  <> "+'<\\/'+'a'+'>');\n// -->\n")) >>
                      H.noscript (preEscapedText $ obfuscateString altText)
                 _ -> throwError $ PandocSomeError $ "Unknown obfuscation method: " <> tshow meth
-        _ -> addAttrs opts attr $ H.a ! A.href (toValue s) $ toHtml txt  -- malformed email
+        _ -> addAttrs opts attr $ H.a ! A.href (toValue $ toURI html5 s)
+                                      $ toHtml txt  -- malformed email
 
 -- | Obfuscate character as entity.
 obfuscateChar :: Char -> Text
@@ -889,7 +885,7 @@ blockToHtmlInner opts (Div attr@(ident, classes, kvs') bs) = do
                  | "nonincremental" `elem` classes -> opts{ writerIncremental = False }
                  | otherwise -> opts
       -- we remove "incremental" and "nonincremental" if we're in a
-      -- slide presentaiton format.
+      -- slide presentation format.
       classes' = case slideVariant of
         NoSlides -> classes
         _ -> filter (\k -> k /= "incremental" && k /= "nonincremental") classes
@@ -1019,8 +1015,7 @@ blockToHtmlInner opts (Header level (ident,classes,kvs) lst) = do
               _ -> H.p  contents'
 blockToHtmlInner opts (BulletList lst) = do
   contents <- mapM (listItemToHtml opts) lst
-  let isTaskList = not (null lst) && all isTaskListItem lst
-  (if isTaskList then (! A.class_ "task-list") else id) <$>
+  (if isJust (mapM toTaskListItem lst) then (! A.class_ "task-list") else id) <$>
     unordList opts contents
 blockToHtmlInner opts (OrderedList (startnum, numstyle, _) lst) = do
   contents <- mapM (listItemToHtml opts) lst
@@ -1272,19 +1267,13 @@ tableRowToHtml :: PandocMonad m
                => WriterOptions
                -> TableRow
                -> StateT WriterState m Html
-tableRowToHtml opts (TableRow tblpart attr rownum rowhead rowbody) = do
-  let rowclass = case rownum of
-        Ann.RowNumber x | x `rem` 2 == 1   -> "odd"
-        _               | tblpart /= Thead -> "even"
-        _                                  -> "header"
-  let attr' = case attr of
-                (id', classes, rest) -> (id', rowclass:classes, rest)
+tableRowToHtml opts (TableRow tblpart attr _rownum rowhead rowbody) = do
   let celltype = case tblpart of
                    Thead -> HeaderCell
                    _     -> BodyCell
   headcells <- mapM (cellToHtml opts HeaderCell) rowhead
   bodycells <- mapM (cellToHtml opts celltype) rowbody
-  rowHtml <- addAttrs opts attr' $ H.tr $ do
+  rowHtml <- addAttrs opts attr $ H.tr $ do
     nl
     mconcat headcells
     mconcat bodycells
@@ -1503,8 +1492,7 @@ inlineToHtml opts inline = do
                            InlineMath  -> "\\textstyle "
                            DisplayMath -> "\\displaystyle "
               return $ imtag ! A.style "vertical-align:middle"
-                             ! A.src (toValue . (url <>) .
-                                 urlEncode $ s <> str')
+                             ! A.src (toValue . (url <>) . urlEncode $ s <> str')
                              ! A.alt (toValue str')
                              ! A.title (toValue str')
                              ! A.class_ mathClass
@@ -1566,7 +1554,8 @@ inlineToHtml opts inline = do
                                                              else writerIdentifierPrefix opts
                                              in  "#" <> prefix <> xs
                                    _ -> s
-                        let link = H.a ! A.href (toValue s') $ linkText
+                        let link = H.a ! A.href (toValue $ toURI html5 s')
+                                       $ linkText
                         link' <- addAttrs opts (ident, classes, kvs) link
                         return $ if T.null tit
                                     then link'
@@ -1581,7 +1570,7 @@ inlineToHtml opts inline = do
                               -- reveal.js uses data-src for lazy loading
                               (if isReveal
                                   then customAttribute "data-src" $ toValue s
-                                  else A.src $ toValue s) :
+                                  else A.src $ toValue $ toURI html5 s) :
                               [A.title $ toValue tit | not (T.null tit)] ++
                               attrs
                             imageTag = (if html5 then H5.img else H.img
@@ -1592,7 +1581,8 @@ inlineToHtml opts inline = do
                               let linkTxt = if null txt
                                             then fallbackTxt
                                             else alternate
-                              in (tg $ H.a ! A.href (toValue s) $ toHtml linkTxt
+                              in (tg $ H.a ! A.href (toValue $ toURI html5 s)
+                                           $ toHtml linkTxt
                                  , [A5.controls ""] )
                             s' = fromMaybe s $ T.stripSuffix ".gz" s
                             normSrc = maybe (T.unpack s) uriPath (parseURIReference $ T.unpack s')
@@ -1615,7 +1605,7 @@ inlineToHtml opts inline = do
                         modify $ \st -> st {stNotes = htmlContents:notes}
                         slideVariant <- gets stSlideVariant
                         let revealSlash = T.pack ['/' | slideVariant == RevealJsSlides]
-                        let link = H.a ! A.href (toValue $ "#" <>
+                        let link = H.a ! A.href (toValue $ toURI html5 $ "#" <>
                                          revealSlash <>
                                          writerIdentifierPrefix opts <> "fn" <> ref)
                                        ! A.class_ "footnote-ref"
@@ -1775,3 +1765,9 @@ removeLinks = walk go
  where
   go (Link attr ils _) = Span attr ils
   go x = x
+
+toURI :: Bool -> Text -> Text
+toURI isHtml5 t = if isHtml5 then t else escapeURI t
+ where
+   escapeURI = T.pack . escapeURIString (not . needsEscaping) . T.unpack
+   needsEscaping c = isSpace c || T.any (== c) "<>|\"{}[]^`" || not (isAscii c)

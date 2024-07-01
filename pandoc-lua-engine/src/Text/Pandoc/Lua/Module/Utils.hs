@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeApplications    #-}
 {- |
    Module      : Text.Pandoc.Lua.Module.Utils
-   Copyright   : Copyright © 2017-2023 Albert Krewinkel
+   Copyright   : Copyright © 2017-2024 Albert Krewinkel
    License     : GNU GPL, version 2 or above
 
    Maintainer  : Albert Krewinkel <tarleb+pandoc@moltkeplatz.de>
@@ -29,6 +29,7 @@ import Text.Pandoc.Citeproc (getReferences, processCitations)
 import Text.Pandoc.Definition
 import Text.Pandoc.Error (PandocError)
 import Text.Pandoc.Filter (applyJSONFilter)
+import Text.Pandoc.Lua.Filter (runFilterFile')
 import Text.Pandoc.Lua.Marshal.AST
 import Text.Pandoc.Lua.Marshal.Reference
 import Text.Pandoc.Lua.PandocLua (PandocLua (unPandocLua))
@@ -60,6 +61,7 @@ documentedModule = Module
     , from_simple_table `since` v[2,11]
     , make_sections     `since` v[2,8]
     , references        `since` v[2,17]
+    , run_lua_filter    `since` v[3,2,1]
     , run_json_filter   `since` v[2,1,1]
     , normalize_date    `since` v[2,0,6]
     , sha1              `since` v[2,0,6]
@@ -246,6 +248,39 @@ references = defun "references"
   , "    end"
   ]
 
+-- | Run a filter from a file.
+run_lua_filter :: DocumentedFunction PandocError
+run_lua_filter = defun "run_lua_filter"
+  ### (\doc fp mbenv -> do
+         envIdx <- maybe copyOfGlobalTable pure mbenv
+         runFilterFile' envIdx fp doc)
+  <#> parameter peekPandoc "Pandoc" "doc" "the Pandoc document to filter"
+  <#> parameter peekString "string" "filter" "filepath of the filter to run"
+  <#> opt (parameter (typeChecked "table" istable pure) "table" "env"
+            "environment to load and run the filter in")
+  =#> functionResult pushPandoc "Pandoc" "filtered document"
+  #? ( "Filter the given doc by passing it through a Lua filter." <>
+       "\n\nThe filter will be run in the current Lua process." <>
+       "\n"
+     )
+  where
+    copynext :: LuaError e => StackIndex -> LuaE e StackIndex
+    copynext to =
+      Lua.next (nth 2) >>= \case
+        False -> pure to
+        True -> do
+          pushvalue (nth 2)
+          insert (nth 2)
+          rawset to
+          copynext to
+    copyOfGlobalTable :: LuaError e => LuaE e StackIndex
+    copyOfGlobalTable = do
+      newtable
+      pushglobaltable
+      pushnil
+      (copynext =<< absindex (nth 3)) <* pop 1 -- pop source table
+
+-- | Process the document with a JSON filter.
 run_json_filter :: DocumentedFunction PandocError
 run_json_filter = defun "run_json_filter"
   ### (\doc filterPath margs -> do
@@ -369,10 +404,12 @@ type' = defun "type"
   , "function."
   , ""
   , "Usage:"
+  , ""
   , "    -- Prints one of 'string', 'boolean', 'Inlines', 'Blocks',"
   , "    -- 'table', and 'nil', corresponding to the Haskell constructors"
   , "    -- MetaString, MetaBool, MetaInlines, MetaBlocks, MetaMap,"
   , "    -- and an unset value, respectively."
+  , ""
   , "    function Meta (meta)"
   , "      print('type of metavalue `author`:', pandoc.utils.type(meta.author))"
   , "    end"

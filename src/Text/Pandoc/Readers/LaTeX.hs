@@ -4,7 +4,7 @@
 {-# LANGUAGE ViewPatterns          #-}
 {- |
    Module      : Text.Pandoc.Readers.LaTeX
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -533,9 +533,9 @@ ifToggle :: PandocMonad m => LP m ()
 ifToggle = do
   name <- braced
   spaces
-  yes <- braced
+  yes <- withVerbatimMode braced
   spaces
-  no <- braced
+  no <- withVerbatimMode braced
   toggles <- sToggles <$> getState
   TokStream _ inp <- getInput
   let name' = untokenize name
@@ -551,8 +551,8 @@ ifstrequal :: (PandocMonad m, Monoid a) => LP m a
 ifstrequal = do
   str1 <- tok
   str2 <- tok
-  ifequal <- braced
-  ifnotequal <- braced
+  ifequal <- withVerbatimMode braced
+  ifnotequal <- withVerbatimMode braced
   TokStream _ ts <- getInput
   if str1 == str2
      then setInput $ TokStream False (ifequal ++ ts)

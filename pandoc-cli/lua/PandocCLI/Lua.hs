@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {- |
    Module      : PandocCLI.Lua
-   Copyright   : © 2022-2023 Albert Krewinkel
+   Copyright   : © 2022-2024 Albert Krewinkel
    License     : GPL-2.0-or-later
    Maintainer  : Albert Krewinkel <albert@zeitkraut.de>
 
@@ -41,8 +41,10 @@ runLuaInterpreter progName args = do
   where
     runStandaloneWithHistory histfile =  do
       let settings = Settings
-            { settingsVersionInfo = "\nEmbedded in pandoc " <>
-                                    pandocVersionText
+            { settingsVersionInfo =
+              "\nEmbedded in pandoc " <>
+              pandocVersionText <>
+              "  Copyright (C) 2006-2024 John MacFarlane"
             , settingsRunner = runner
             , settingsHistory = Just histfile
             }

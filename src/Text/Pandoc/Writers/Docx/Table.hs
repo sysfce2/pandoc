@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {- |
 Module      : Text.Pandoc.Writers.Docx.Table
-Copyright   : Copyright (C) 2012-2023 John MacFarlane
+Copyright   : Copyright (C) 2012-2024 John MacFarlane
 License     : GNU GPL, version 2 or above
 Maintainer  : John MacFarlane <jgm@berkeley.edu>
 
@@ -159,7 +159,7 @@ alignmentToString = \case
   AlignLeft    -> "left"
   AlignRight   -> "right"
   AlignCenter  -> "center"
-  AlignDefault -> "left"
+  AlignDefault -> ""
 
 tableLayout :: [ColSpec] -> ([Element], [(Text, Text)])
 tableLayout specs =
@@ -253,7 +253,7 @@ ooxmlCellToOpenXML blocksToOpenXML = \case
       , mknode "w:p" [] [mknode "w:pPr" [] ()]]
   OOXMLCell _attr align rowspan (ColSpan colspan) contents -> do
     compactStyle <- pStyleM "Compact"
-    es <- withParaProp (alignmentFor align) $ blocksToOpenXML contents
+    es <- maybe id withParaProp (alignmentFor align) $ blocksToOpenXML contents
     -- Table cells require a <w:p> element, even an empty one!
     -- Not in the spec but in Word 2007, 2010. See #4953. And
     -- apparently the last element must be a <w:p>, see #6983.
@@ -271,5 +271,6 @@ ooxmlCellToOpenXML blocksToOpenXML = \case
              e:_   | qName (elName e) == "p" -> es
              _ -> es ++ [Elem $ mknode "w:p" [] ()]
 
-alignmentFor :: Alignment -> Element
-alignmentFor al = mknode "w:jc" [("w:val",alignmentToString al)] ()
+alignmentFor :: Alignment -> Maybe Element
+alignmentFor AlignDefault = Nothing
+alignmentFor al = Just $ mknode "w:jc" [("w:val",alignmentToString al)] ()

@@ -3,7 +3,7 @@
 {- |
    Module      : Text.Pandoc.Readers.Textile
    Copyright   : Copyright (C) 2010-2012 Paul Rivier
-                               2010-2023 John MacFarlane
+                               2010-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : Paul Rivier <paul*rivier#demotera*com>
@@ -685,9 +685,12 @@ escapedTag = B.str . T.pack <$>
 
 -- | Any special symbol defined in wordBoundaries
 symbol :: PandocMonad m => TextileParser m Inlines
-symbol = B.str . T.singleton <$> (notFollowedBy newline *>
-                                  notFollowedBy rawHtmlBlock *>
-                                  oneOf wordBoundaries)
+symbol = do
+  c <- notFollowedBy newline *>
+         notFollowedBy rawHtmlBlock *>
+         oneOf wordBoundaries
+  updateLastStrPos
+  pure $ B.str . T.singleton $ c
 
 -- | Inline code
 code :: PandocMonad m => TextileParser m Inlines

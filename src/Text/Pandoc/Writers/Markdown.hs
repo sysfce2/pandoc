@@ -5,7 +5,7 @@
 {-# LANGUAGE BangPatterns        #-}
 {- |
    Module      : Text.Pandoc.Writers.Markdown
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -466,16 +466,15 @@ blockToMarkdown' opts b@(RawBlock f str) = do
       | f == "plain" -> return $ literal str <> literal "\n"
     Commonmark
       | f `elem` ["gfm", "commonmark", "commonmark_x", "markdown"]
-         -> return $ literal str <> literal "\n"
+         -> return $ literal str $$ blankline
       | f `elem` ["html", "html5", "html4"]
-         -> return $ literal (removeBlankLinesInHTML str) <> literal "\n"
+         -> return $ literal (removeBlankLinesInHTML str) $$ blankline
     Markdown
       | f `elem` ["markdown", "markdown_github", "markdown_phpextra",
                   "markdown_mmd", "markdown_strict"]
          -> return $ literal str <> literal "\n"
     Markua -> renderEmpty
-    _ | isEnabled Ext_raw_attribute opts -> rawAttribBlock
-      | f `elem` ["html", "html5", "html4"]
+    _ | f `elem` ["html", "html5", "html4"]
       , isEnabled Ext_markdown_attribute opts
          -> return $ literal (addMarkdownAttribute str) <> literal "\n"
       | f `elem` ["html", "html5", "html4"]
@@ -484,6 +483,7 @@ blockToMarkdown' opts b@(RawBlock f str) = do
       | f `elem` ["latex", "tex"]
       , isEnabled Ext_raw_tex opts
          -> return $ literal str <> literal "\n"
+      | isEnabled Ext_raw_attribute opts -> rawAttribBlock
     _ -> renderEmpty
 blockToMarkdown' opts HorizontalRule = do
   variant <- asks envVariant
@@ -592,7 +592,7 @@ blockToMarkdown' opts (BlockQuote blocks) = do
         | variant == PlainText = "  "
         | otherwise            = "> "
   contents <- blockListToMarkdown opts blocks
-  return $ prefixed leader contents <> blankline
+  return $ text leader <> prefixed leader contents <> blankline
 blockToMarkdown' opts t@(Table (ident,_,_) blkCapt specs thead tbody tfoot) = do
   let (caption, aligns, widths, headers, rows) = toLegacyTable blkCapt specs thead tbody tfoot
   let numcols = maximum (length aligns :| length widths :
@@ -716,7 +716,10 @@ blockToMarkdown' opts (Figure figattr capt body) = do
       -- fallback to raw html if possible or div otherwise
       if isEnabled Ext_raw_html opts
       then figureToMarkdown opts figattr capt body
-      else blockToMarkdown' opts $ figureDiv figattr capt body
+      else if (isEnabled Ext_fenced_divs opts || isEnabled Ext_native_divs opts) ||
+                  not (isEnabled Ext_implicit_figures opts)
+              then blockToMarkdown' opts $ figureDiv figattr capt body
+              else blockListToMarkdown opts body
 
 inList :: Monad m => MD m a -> MD m a
 inList p = local (\env -> env {envInList = True}) p

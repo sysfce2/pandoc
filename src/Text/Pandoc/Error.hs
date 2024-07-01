@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {- |
    Module      : Text.Pandoc.Error
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -136,7 +136,8 @@ renderError e =
          _     -> ""
     PandocUnsupportedExtensionError ext f ->
       "The extension " <> ext <> " is not supported " <>
-      "for " <> f
+      "for " <> f <> ".\nUse --list-extensions=" <> f <> " to " <>
+      "list supported extensions."
     PandocCiteprocError e' ->
       prettyCiteprocError e'
     PandocBibliographyError fp msg ->

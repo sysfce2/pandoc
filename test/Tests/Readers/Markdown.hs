@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {- |
    Module      : Tests.Readers.Markdown
-   Copyright   : © 2006-2023 John MacFarlane
+   Copyright   : © 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -449,7 +449,7 @@ tests = [ testGroup "inline code"
                   <>
                   codeBlockWith ("",["haskell"],[]) "b"
                   <>
-                  rawBlock "html" "<div>\n\n"
+                  divWith ("",[],[]) mempty
           ]
 -- the round-trip properties frequently fail
 --        , testGroup "round trip"

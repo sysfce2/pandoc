@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {- |
    Module      : Text.Pandoc.Readers.DocBook
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -44,8 +44,9 @@ import Text.Pandoc.Builder
 import Text.Pandoc.Class.PandocMonad (PandocMonad, report)
 import Text.Pandoc.Options
 import Text.Pandoc.Logging (LogMessage(..))
-import Text.Pandoc.Shared (safeRead, extractSpaces, headerShift)
+import Text.Pandoc.Shared (safeRead, extractSpaces)
 import Text.Pandoc.Sources (ToSources(..), sourcesToText)
+import Text.Pandoc.Transforms (headerShift)
 import Text.TeXMath (readMathML, writeTeX)
 import qualified Data.Map as M
 import Text.Pandoc.XML.Light

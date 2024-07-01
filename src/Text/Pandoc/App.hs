@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {- |
    Module      : Text.Pandoc.App
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley@edu>
@@ -57,6 +57,8 @@ import Text.Pandoc.App.CommandLineOptions (parseOptions, parseOptionsFromArgs,
                                            options, handleOptInfo)
 import Text.Pandoc.App.Input (InputParameters (..), readInput)
 import Text.Pandoc.App.OutputSettings (OutputSettings (..), optToOutputSettings)
+import Text.Pandoc.Transforms (applyTransforms, filterIpynbOutput,
+                               headerShift, eastAsianLineBreakFilter)
 import Text.Collate.Lang (Lang (..), parseLang)
 import Text.Pandoc.Filter (Filter (JSONFilter, LuaFilter), Environment (..),
                            applyFilters)
@@ -64,8 +66,7 @@ import qualified Text.Pandoc.Format as Format
 import Text.Pandoc.PDF (makePDF)
 import Text.Pandoc.Scripting (ScriptingEngine (..), CustomComponents(..))
 import Text.Pandoc.SelfContained (makeSelfContained)
-import Text.Pandoc.Shared (eastAsianLineBreakFilter,
-         headerShift, filterIpynbOutput, tshow)
+import Text.Pandoc.Shared (tshow)
 import Text.Pandoc.URI (isURI)
 import Text.Pandoc.Writers.Shared (lookupMetaString)
 import Text.Pandoc.Readers.Markdown (yamlToMeta)
@@ -297,8 +298,8 @@ convertWithOpts' scriptingEngine istty datadir opts = do
           >>= ( return . adjustMetadata (metadataFromFile <>)
             >=> return . adjustMetadata (<> optMetadata opts)
             >=> return . adjustMetadata (<> cslMetadata)
-            >=> applyTransforms transforms
             >=> applyFilters scriptingEngine filterEnv filters [T.unpack format]
+            >=> applyTransforms transforms
             >=> (if not (optSandbox opts) &&
                     (isJust (optExtractMedia opts)
                      || format == "docx") -- for fallback pngs
@@ -340,8 +341,6 @@ data PandocOutput =
     | BinaryOutput BL.ByteString
     | ZipOutput BL.ByteString
   deriving (Show)
-
-type Transform = Pandoc -> Pandoc
 
 -- | Configure the common state
 configureCommonState :: PandocMonad m => Maybe FilePath -> Opt -> m ()
@@ -411,11 +410,6 @@ isTextFormat s = s `notElem` ["odt","docx","epub2","epub3","epub","pptx"]
 
 adjustMetadata :: (Meta -> Meta) -> Pandoc -> Pandoc
 adjustMetadata f (Pandoc meta bs) = Pandoc (f meta) bs
-
--- Transformations of a Pandoc document post-parsing:
-
-applyTransforms :: Monad m => [Transform] -> Pandoc -> m Pandoc
-applyTransforms transforms d = return $ foldr ($) d transforms
 
 writeFnBinary :: FilePath -> BL.ByteString -> IO ()
 writeFnBinary "-" = BL.putStr

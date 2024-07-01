@@ -7,7 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {- |
    Module      : Text.Pandoc.Readers.LaTeX.Parsing
-   Copyright   : Copyright (C) 2006-2023 John MacFarlane
+   Copyright   : Copyright (C) 2006-2024 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -885,7 +885,12 @@ dimenarg = try $ do
   optional sp
   ch  <- option False $ True <$ symbol '='
   minus <- option "" $ "-" <$ symbol '-'
-  Tok _ _ s1 <- satisfyTok isWordTok
+  s1 <- option ""
+        (do Tok _ _ s1 <- satisfyTok isWordTok
+            guard (case T.uncons s1 of
+                     Just (c,_) -> isDigit c
+                     Nothing -> False)
+            pure s1)
   s2 <- option "" $ try $ do
           symbol '.'
           Tok _ _ t <-  satisfyTok isWordTok
