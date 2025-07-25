@@ -148,6 +148,7 @@
       email: "" ),
     ),
   date: [July 17, 2006],
+  abstract-title: [Abstract],
   pagenumbering: "1",
   cols: 1,
   doc,
